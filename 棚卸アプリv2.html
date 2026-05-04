@@ -374,25 +374,24 @@ async function scanLoop() {
   rafId = requestAnimationFrame(scanLoop);
 }
 
-// バーコード検索
-async function lookupBarcode(code) {
-  const gasUrl = getGasUrl();
-  if (!gasUrl) return;
-  try {
-    const res = await fetch(gasUrl, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'lookupBarcode', barcode: code })
-    });
-    const data = await res.json();
-    if (data.status === 'found') {
-      document.getElementById('name').value = data.name;
-      showToast('商品名: ' + data.name);
-      document.getElementById('qty-display').focus();
-    } else {
-      document.getElementById('name').value = '';
-      document.getElementById('name').focus();
-    }
-  } catch(e) {}
+// バーコード検索（ローカルキャッシュから）
+function lookupBarcode(code) {
+  const cache = JSON.parse(localStorage.getItem('barcodeCache') || '{}');
+  if (cache[code]) {
+    document.getElementById('name').value = cache[code];
+    showToast('商品名: ' + cache[code]);
+    document.getElementById('qty-display').focus();
+  } else {
+    document.getElementById('name').value = '';
+    document.getElementById('name').focus();
+  }
+}
+
+// キャッシュ保存
+function saveToCache(barcode, name) {
+  const cache = JSON.parse(localStorage.getItem('barcodeCache') || '{}');
+  cache[barcode] = name;
+  localStorage.setItem('barcodeCache', JSON.stringify(cache));
 }
 
 // 個数
@@ -413,19 +412,16 @@ window.submitItem = async function() {
   if (!name)    { showToast('商品名を入力してください'); return; }
   showToast('登録中...');
   try {
-    const res = await fetch(gasUrl, {
+    await fetch(gasUrl, {
       method: 'POST',
+      mode: 'no-cors',
       body: JSON.stringify({ action: 'addRow', barcode, name, quantity: qty, memo })
     });
-    const data = await res.json();
-    if (data.status === 'ok') {
-      sessionItems.push({ barcode, name, qty, memo, time: new Date().toLocaleTimeString('ja-JP') });
-      renderList();
-      clearForm();
-      showToast('✓ 登録しました');
-    } else {
-      showToast('エラー: ' + data.message);
-    }
+    saveToCache(barcode, name);
+    sessionItems.push({ barcode, name, qty, memo, time: new Date().toLocaleTimeString('ja-JP') });
+    renderList();
+    clearForm();
+    showToast('✓ 登録しました');
   } catch(e) {
     showToast('通信エラーが発生しました');
   }
