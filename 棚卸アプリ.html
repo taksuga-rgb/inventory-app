@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="棚卸アプリ">
+<title>棚卸アプリ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Helvetica Neue', sans-serif;
+    background: #f2f2f7;
+    color: #1c1c1e;
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+  header {
+    background: #fff;
+    padding: 16px 20px 12px;
+    border-bottom: 0.5px solid #c6c6c8;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header h1 { font-size: 20px; font-weight: 600; }
+  header p { font-size: 12px; color: #8e8e93; margin-top: 2px; }
+
+  .section {
+    background: #fff;
+    margin: 16px 16px 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 0.5px solid #c6c6c8;
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6e6e73;
+    padding: 12px 16px 8px;
+    background: #f2f2f7;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* カメラ */
+  #camera-area {
+    position: relative;
+    background: #000;
+    height: 200px;
+    overflow: hidden;
+  }
+  #camera-area video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  #scan-line {
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: #30d158;
+    animation: scanAnim 1.8s ease-in-out infinite;
+    display: none;
+  }
+  @keyframes scanAnim {
+    0%   { top: 20%; }
+    50%  { top: 75%; }
+    100% { top: 20%; }
+  }
+  #scan-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .scan-frame {
+    width: 200px;
+    height: 100px;
+    border: 2px solid rgba(255,255,255,0.6);
+    border-radius: 8px;
+  }
+  #scan-status {
+    color: rgba(255,255,255,0.9);
+    font-size: 13px;
+    background: rgba(0,0,0,0.5);
+    padding: 4px 12px;
+    border-radius: 20px;
+  }
+
+  /* ボタン */
+  .btn {
+    display: block;
+    width: calc(100% - 32px);
+    margin: 12px 16px;
+    padding: 13px;
+    border-radius: 10px;
+    border: none;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn:active { opacity: 0.7; }
+  .btn-primary { background: #007aff; color: #fff; }
+  .btn-success { background: #30d158; color: #fff; }
+  .btn-danger  { background: #ff3b30; color: #fff; }
+  .btn-gray    { background: #e5e5ea; color: #1c1c1e; }
+
+  /* フォーム */
+  .form-row {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 0.5px solid #e5e5ea;
+    min-height: 48px;
+  }
+  .form-row:last-child { border-bottom: none; }
+  .form-label {
+    font-size: 15px;
+    width: 80px;
+    flex-shrink: 0;
+    color: #1c1c1e;
+  }
+  .form-input {
+    flex: 1;
+    font-size: 15px;
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 12px 0;
+    color: #1c1c1e;
+  }
+  .form-input::placeholder { color: #c7c7cc; }
+
+  /* 個数 */
+  .qty-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+  }
+  .qty-label { font-size: 15px; width: 80px; }
+  .qty-btn {
+    width: 36px; height: 36px;
+    border-radius: 18px;
+    border: none;
+    background: #e5e5ea;
+    font-size: 22px;
+    font-weight: 300;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #007aff;
+  }
+  .qty-btn:active { background: #d1d1d6; }
+  #qty-display {
+    width: 60px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: 500;
+    border: none;
+    outline: none;
+    background: transparent;
+  }
+
+  /* 登録済みリスト */
+  .list-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 0.5px solid #e5e5ea;
+    gap: 12px;
+  }
+  .list-item:last-child { border-bottom: none; }
+  .list-name { flex: 1; font-size: 15px; }
+  .list-barcode { font-size: 12px; color: #8e8e93; }
+  .list-qty {
+    font-size: 18px;
+    font-weight: 600;
+    color: #007aff;
+    min-width: 32px;
+    text-align: right;
+  }
+  .list-del {
+    background: none;
+    border: none;
+    color: #ff3b30;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 4px;
+  }
+  .empty-list {
+    padding: 24px 16px;
+    text-align: center;
+    color: #c7c7cc;
+    font-size: 14px;
+  }
+
+  /* トースト */
+  #toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: rgba(44,44,46,0.92);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    transition: transform 0.3s;
+    z-index: 999;
+    white-space: nowrap;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* 設定 */
+  .settings-input {
+    flex: 1;
+    font-size: 13px;
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 12px 0;
+    color: #8e8e93;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📦 棚卸アプリ</h1>
+  <p id="header-status">スキャン待機中</p>
+</header>
+
+<!-- GAS URL設定 -->
+<p class="section-title" style="margin: 16px 16px 0; background: transparent;">設定</p>
+<div class="section">
+  <div class="form-row">
+    <span class="form-label" style="font-size:13px;">GAS URL</span>
+    <input class="settings-input" id="gas-url" type="url" placeholder="デプロイURLを貼り付け" />
+  </div>
+</div>
+
+<!-- カメラセクション -->
+<p class="section-title" style="margin: 16px 16px 0; background: transparent;">スキャン</p>
+<div class="section">
+  <div id="camera-area">
+    <div id="scan-overlay">
+      <div class="scan-frame"></div>
+      <span id="scan-status">カメラ停止中</span>
+    </div>
+    <div id="scan-line"></div>
+  </div>
+  <button class="btn btn-primary" id="scan-btn" onclick="toggleScan()">カメラ起動</button>
+</div>
+
+<!-- 入力フォーム -->
+<p class="section-title" style="margin: 16px 16px 0; background: transparent;">入力</p>
+<div class="section">
+  <div class="form-row">
+    <span class="form-label">バーコード</span>
+    <input class="form-input" id="barcode" placeholder="スキャンまたは手入力" />
+  </div>
+  <div class="form-row">
+    <span class="form-label">商品名</span>
+    <input class="form-input" id="name" placeholder="商品名を入力" />
+  </div>
+  <div class="qty-row">
+    <span class="qty-label">個数</span>
+    <button class="qty-btn" onclick="changeQty(-1)">−</button>
+    <input id="qty-display" type="number" value="1" min="1" max="9999" />
+    <button class="qty-btn" onclick="changeQty(1)">＋</button>
+  </div>
+  <div class="form-row">
+    <span class="form-label">メモ</span>
+    <input class="form-input" id="memo" placeholder="任意" />
+  </div>
+</div>
+<button class="btn btn-success" onclick="submitItem()">スプレッドシートに登録</button>
+
+<!-- 登録済みリスト -->
+<p class="section-title" style="margin: 16px 16px 0; background: transparent;">今日の登録一覧</p>
+<div class="section" id="item-list">
+  <p class="empty-list">まだ登録がありません</p>
+</div>
+<button class="btn btn-gray" onclick="exportCSV()">CSVをダウンロード</button>
+
+<div id="toast"></div>
+
+<script>
+let scanning = false;
+let sessionItems = [];
+
+// ===== GAS URL 保存・読み込み =====
+const gasUrlInput = document.getElementById('gas-url');
+gasUrlInput.value = localStorage.getItem('gasUrl') || '';
+gasUrlInput.addEventListener('change', () => {
+  localStorage.setItem('gasUrl', gasUrlInput.value.trim());
+  showToast('GAS URLを保存しました');
+});
+
+function getGasUrl() {
+  return localStorage.getItem('gasUrl') || '';
+}
+
+// ===== スキャン =====
+function toggleScan() {
+  if (scanning) stopScan();
+  else startScan();
+}
+
+function startScan() {
+  const gasUrl = getGasUrl();
+  if (!gasUrl) { showToast('先にGAS URLを設定してください'); return; }
+
+  document.getElementById('scan-status').textContent = '起動中...';
+  document.getElementById('scan-btn').textContent = 'カメラ停止';
+  document.getElementById('scan-line').style.display = 'block';
+
+  Quagga.init({
+    inputStream: {
+      name: 'Live',
+      type: 'LiveStream',
+      target: document.querySelector('#camera-area'),
+      constraints: { facingMode: 'environment', width: 640, height: 480 }
+    },
+    decoder: {
+      readers: ['ean_reader', 'code_128_reader', 'code_39_reader', 'upc_reader']
+    }
+  }, err => {
+    if (err) {
+      showToast('カメラ起動エラー: ' + err.message);
+      stopScan(); return;
+    }
+    Quagga.start();
+    scanning = true;
+    document.getElementById('scan-status').textContent = 'スキャン中...';
+    document.getElementById('header-status').textContent = 'スキャン中';
+  });
+
+  Quagga.offDetected();
+  Quagga.onDetected(result => {
+    const code = result.codeResult.code;
+    if (!code) return;
+    stopScan();
+    document.getElementById('barcode').value = code;
+    showToast('読み取り: ' + code);
+    lookupBarcode(code);
+  });
+}
+
+function stopScan() {
+  Quagga.stop();
+  scanning = false;
+  document.getElementById('scan-btn').textContent = 'カメラ起動';
+  document.getElementById('scan-status').textContent = 'カメラ停止中';
+  document.getElementById('scan-line').style.display = 'none';
+  document.getElementById('header-status').textContent = 'スキャン待機中';
+}
+
+// ===== バーコード検索 =====
+async function lookupBarcode(code) {
+  const gasUrl = getGasUrl();
+  if (!gasUrl) return;
+  try {
+    const res = await fetch(gasUrl, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'lookupBarcode', barcode: code })
+    });
+    const data = await res.json();
+    if (data.status === 'found') {
+      document.getElementById('name').value = data.name;
+      showToast('商品名: ' + data.name);
+      document.getElementById('qty-display').focus();
+    } else {
+      document.getElementById('name').value = '';
+      document.getElementById('name').focus();
+    }
+  } catch (e) { /* ネットワークエラー時は無視 */ }
+}
+
+// ===== 個数 =====
+function changeQty(delta) {
+  const el = document.getElementById('qty-display');
+  const val = parseInt(el.value) || 1;
+  el.value = Math.max(1, val + delta);
+}
+
+// ===== 登録 =====
+async function submitItem() {
+  const gasUrl = getGasUrl();
+  if (!gasUrl) { showToast('GAS URLが未設定です'); return; }
+
+  const barcode = document.getElementById('barcode').value.trim();
+  const name    = document.getElementById('name').value.trim();
+  const qty     = parseInt(document.getElementById('qty-display').value) || 1;
+  const memo    = document.getElementById('memo').value.trim();
+
+  if (!barcode) { showToast('バーコードを入力してください'); return; }
+  if (!name)    { showToast('商品名を入力してください'); return; }
+
+  showToast('登録中...');
+  try {
+    const res = await fetch(gasUrl, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'addRow', barcode, name, quantity: qty, memo })
+    });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      sessionItems.push({ barcode, name, qty, memo, time: new Date().toLocaleTimeString('ja-JP') });
+      renderList();
+      clearForm();
+      showToast('✓ 登録しました');
+    } else {
+      showToast('エラー: ' + data.message);
+    }
+  } catch (e) {
+    showToast('通信エラーが発生しました');
+  }
+}
+
+function clearForm() {
+  document.getElementById('barcode').value = '';
+  document.getElementById('name').value = '';
+  document.getElementById('qty-display').value = '1';
+  document.getElementById('memo').value = '';
+}
+
+// ===== リスト表示 =====
+function renderList() {
+  const el = document.getElementById('item-list');
+  if (sessionItems.length === 0) {
+    el.innerHTML = '<p class="empty-list">まだ登録がありません</p>';
+    return;
+  }
+  el.innerHTML = [...sessionItems].reverse().map((item, i) => `
+    <div class="list-item">
+      <div style="flex:1">
+        <div class="list-name">${item.name}</div>
+        <div class="list-barcode">${item.barcode} · ${item.time}</div>
+      </div>
+      <div class="list-qty">${item.qty}</div>
+      <button class="list-del" onclick="deleteItem(${sessionItems.length - 1 - i})">×</button>
+    </div>
+  `).join('');
+}
+
+function deleteItem(index) {
+  sessionItems.splice(index, 1);
+  renderList();
+}
+
+// ===== CSV出力 =====
+function exportCSV() {
+  if (sessionItems.length === 0) { showToast('登録データがありません'); return; }
+  const header = '日時,バーコード,商品名,個数,メモ\n';
+  const rows = sessionItems.map(item => {
+    const date = new Date().toLocaleDateString('ja-JP');
+    return `${date},${item.barcode},"${item.name}",${item.qty},"${item.memo}"`;
+  }).join('\n');
+  const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `棚卸_${new Date().toLocaleDateString('ja-JP').replace(/\//g, '')}.csv`;
+  a.click();
+  showToast('CSVをダウンロードしました');
+}
+
+// ===== トースト =====
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
